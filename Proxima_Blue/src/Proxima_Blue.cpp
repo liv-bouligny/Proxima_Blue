@@ -1,3 +1,9 @@
+/******************************************************/
+//       THIS IS A GENERATED FILE - DO NOT EDIT       //
+/******************************************************/
+
+#include "Particle.h"
+#line 1 "c:/Users/Jason.000/Documents/IoT/Proxima_Blue/Proxima_Blue/src/Proxima_Blue.ino"
 /*
  * Project: Proximity_Detection
  * Description: Detect nearby devices to warn machinery operators or automated machines of nearby safety concerns
@@ -7,6 +13,10 @@
 
 #include "Adafruit_SSD1306.h"
 
+void setup();
+void loop();
+void onDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
+#line 10 "c:/Users/Jason.000/Documents/IoT/Proxima_Blue/Proxima_Blue/src/Proxima_Blue.ino"
 SYSTEM_THREAD(ENABLED);
 
 SerialLogHandler logHandler;
