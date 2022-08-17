@@ -24,7 +24,9 @@ const BleUuid serviceUuid("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
 const BleUuid rxUuid("6E400002-B5A3-F393-E0A9-E50E24DCCA9E");
 const BleUuid txUuid("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
 
-unsigned long lastScan, last;
+unsigned long lastScan;
+long last = -60000;
+long scanTime = 60000;
 BleAddress peripheralAddr;
 int rssi, i, j, neoSig, infiniSig, roombaSig, scanCount, duckCount, infiniCount, roombaCount;
 int neoDuck[50];
@@ -34,7 +36,7 @@ byte scanMAC[50];
 
 
 BleCharacteristic txCharacteristic("tx", BleCharacteristicProperty::NOTIFY, txUuid, serviceUuid);
-// BleCharacteristic rxCharacteristic("rx", BleCharacteristicProperty::WRITE_WO_RSP, rxUuid, serviceUuid, onDataReceived, NULL);
+BleCharacteristic rxCharacteristic("rx", BleCharacteristicProperty::WRITE_WO_RSP, rxUuid, serviceUuid, onDataReceived, NULL);
 BleAdvertisingData data;
 
 BleScanResult scanResults[SCAN_RESULT_MAX];
@@ -52,7 +54,7 @@ void setup() {
 
   BLE.on ();
   BLE.addCharacteristic(txCharacteristic);
-  // BLE.addCharacteristic(rxCharacteristic);
+  BLE.addCharacteristic(rxCharacteristic);
   data.appendServiceUUID(serviceUuid);
   BLE.advertise(&data);
   BLE.setTxPower(8);
@@ -71,11 +73,11 @@ void setup() {
 }
 
 void loop() {
-  if (millis() - last > 60000) {
-    scanCount = 0;
+  if (millis() - last > scanTime) {
+    scanCount = 0;    
     for (j = 0; j < 10; j++) {
       scanCount++;
-      Serial.printf("Scan %i\n",scanCount);      
+      Serial.printf("Scan %i\n%u ms Start\n",scanCount, millis());      
         //Vector Scan
       Vector<BleScanResult> scanResults = BLE.scan();
       if (scanResults.size()) {
@@ -87,35 +89,41 @@ void loop() {
           //   scanResults[i].address()[2], scanResults[i].address()[1], scanResults[i].address()[0], scanResults[i].rssi());
           sprintf((char *)scanMAC,"MAC: %02X:%02X:%02X:%02X:%02X:%02X\nRSSI: %i dBm\n",scanResults[i].address()[5], scanResults[i].address()[4], 
             scanResults[i].address()[3], scanResults[i].address()[2], scanResults[i].address()[1], scanResults[i].address()[0], scanResults[i].rssi());
-          if (isRecognized(scanResults[i].address()[1], scanResults[i].address()[0]) == 1) {            
-            neoDuck[duckCount] = scanResults[i].rssi();
+          int device = isRecognized(scanResults[i].address()[1], scanResults[i].address()[0]);
+          if (device == 1) {            
+            neoSig = scanResults[i].rssi();
             txCharacteristic.setValue(scanMAC, 50);
+            Serial.printf("NeoDuck device 1: %i\n", neoSig);
           }  
-          if (isRecognized(scanResults[i].address()[1], scanResults[i].address()[0]) == 2) { 
-              infinity[infiniCount] = scanResults[i].rssi();
-              txCharacteristic.setValue(scanMAC, 50);
+          if (device == 2) { 
+            infiniSig = scanResults[i].rssi();
+            txCharacteristic.setValue(scanMAC, 50);
+            Serial.printf("Infinity device 2: %i\n", infiniSig);
           }
-          if (isRecognized(scanResults[i].address()[1], scanResults[i].address()[0]) == 3) { 
-              roomba[roombaCount] = scanResults[i].rssi();
-              txCharacteristic.setValue(scanMAC, 50);
-          }           
+          if (device == 3) { 
+            roombaSig = scanResults[i].rssi();
+            txCharacteristic.setValue(scanMAC, 50);
+            Serial.printf("Roomba device 3: %i\n", roombaSig);
+          }
+          
+          // Serial.printf("====================\nDistance\nNeoPixel: %i\nInfinity Cube: %i\nRoomba: %i\n====================\n", neoSig, infiniSig, roombaSig);
+          // display.clearDisplay();
+          // display.setCursor(0,0);
+          // display.printf("====================\nDistance\nNeoPixel: %i\nInfinity Cube: %i\nRoomba: %i\n====================\n", neoSig, infiniSig, roombaSig);
+          // display.display();
           // String name = scanResults[i].advertisingData().deviceName();
           // if (name.length() > 0) {
           //   Log.info("Advertising name: %s", name.c_str());
           // }
         }
       }
-    }
-    neoSig = getMedian(neoDuck, duckCount);
-    infiniSig = getMedian(infinity, infiniCount);
-    roombaSig = getMedian(roomba, roombaCount);
-    Serial.printf("====================\nDistance\nNeoPixel: %i\nInfinity Cube: %i\nRoomba: %i\n====================\n", neoSig, infiniSig, roombaSig);
-    display.clearDisplay();
-    display.setCursor(0,0);
-    display.printf("====================\nDistance\nNeoPixel: %i\nInfinity Cube: %i\nRoomba: %i\n====================\n", neoSig, infiniSig, roombaSig);
-    display.display();
+      Serial.printf("Scan %i\n%u ms End\n",scanCount, millis()); 
+    }    
     last = millis();
     BLE.stopScanning();
+    duckCount = 0;
+    infiniCount = 0;
+    roombaCount = 0;
   }    
 }
 
@@ -151,29 +159,30 @@ void loop() {
 // 	BLE.stopScanning();
 // }
 
-// void onDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context) {
-//   uint8_t i;
+void onDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context) {
+  uint8_t i;
   
-//   Serial.printf("Received data from:%02X:%02X:%02X:%02X:%02X:%02X\n",peer.address()[0], peer.address()[1], peer.address()[2], peer.address()[3], peer.address()[4], peer.address()[5]);
-//   Serial.printf("Bytes: ");
+  Serial.printf("Received data from:%02X:%02X:%02X:%02X:%02X:%02X\n",peer.address()[0], peer.address()[1], peer.address()[2], peer.address()[3], peer.address()[4], peer.address()[5]);
+  Serial.printf("Bytes: ");
 
-//   for (i = 0;i < len; i++) {
-//     Serial.printf("%02X ",data[i]);
-//   }
-//   Serial.printf("\n");
-//   Serial.printf("Message: %s\n",(char *)data);
-// }
+  for (i = 0;i < len; i++) {
+    Serial.printf("%02X ",data[i]);
+  }
+  Serial.printf("\n");
+  Serial.printf("Message: %s\n",(char *)data);
+}
 
 int isRecognized(byte addr1, byte addr0) {
-  if (addr1 == (0xF0 || 0xEF || 0xC0)) {
-    switch (addr1) { //identify if device is recognized and return value correspondent to device
+  Serial.printf("%02X:%02X\n", addr1, addr0);
+  if ((addr1 == 0xF0) || (addr1 == 0xEF) || (addr1 == 0xC0)) {
+    switch (addr0) { //identify if device is recognized and return value correspondent to device
       case 0xA8:        
         return 2;
         break;        
-      case 0xEF:        
+      case 0x45:        
         return 3;
         break;        
-      case 0xC0:
+      case 0xC8:
         return 1;
         break;
       default:
