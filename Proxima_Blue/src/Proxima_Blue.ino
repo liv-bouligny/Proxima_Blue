@@ -26,7 +26,7 @@ const BleUuid txUuid("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
 
 unsigned long lastScan;
 long last = -60000;
-long scanTime = 60000;
+long scanTime = 1000;
 BleAddress peripheralAddr;
 int rssi, i, j, neoSig, infiniSig, roombaSig, scanCount, duckCount, infiniCount, roombaCount;
 int neoDuck[50];
@@ -74,19 +74,20 @@ void setup() {
 
 void loop() {
   if (millis() - last > scanTime) {
-    scanCount = 0;    
-    for (j = 0; j < 10; j++) {
-      scanCount++;
-      Serial.printf("Scan %i\n%u ms Start\n",scanCount, millis());      
+    // scanCount = 0;    
+    // for (j = 0; j < 10; j++) {
+      // scanCount++;
+      // Serial.printf("Scan %i\n%u ms Start\n",scanCount, millis());      
         //Vector Scan
+      // BLE.setScanTimeout(100);
       Vector<BleScanResult> scanResults = BLE.scan();
       if (scanResults.size()) {
         Log.info("%d devices found", scanResults.size());
         for (i = 0; i < scanResults.size(); i++) {
           // For Device OS 2.x and earlier, use scanResults[i].address[0], etc. without the ()
-          // Log.info("MAC: %02X:%02X:%02X:%02X:%02X:%02X | RSSI: %i dBm",
-          //   scanResults[i].address()[5], scanResults[i].address()[4], scanResults[i].address()[3],
-          //   scanResults[i].address()[2], scanResults[i].address()[1], scanResults[i].address()[0], scanResults[i].rssi());
+          Serial.printf("MAC: %02X:%02X:%02X:%02X:%02X:%02X | RSSI: %i dBm",
+            scanResults[i].address()[5], scanResults[i].address()[4], scanResults[i].address()[3],
+            scanResults[i].address()[2], scanResults[i].address()[1], scanResults[i].address()[0], scanResults[i].rssi());
           sprintf((char *)scanMAC,"MAC: %02X:%02X:%02X:%02X:%02X:%02X\nRSSI: %i dBm\n",scanResults[i].address()[5], scanResults[i].address()[4], 
             scanResults[i].address()[3], scanResults[i].address()[2], scanResults[i].address()[1], scanResults[i].address()[0], scanResults[i].rssi());
           int device = isRecognized(scanResults[i].address()[1], scanResults[i].address()[0]);
@@ -105,25 +106,23 @@ void loop() {
             txCharacteristic.setValue(scanMAC, 50);
             Serial.printf("Roomba device 3: %i\n", roombaSig);
           }
-          
+          if (scanResults[i].rssi() >= -80) {
+            txCharacteristic.setValue(scanMAC, 50);
+          }
           // Serial.printf("====================\nDistance\nNeoPixel: %i\nInfinity Cube: %i\nRoomba: %i\n====================\n", neoSig, infiniSig, roombaSig);
-          // display.clearDisplay();
-          // display.setCursor(0,0);
-          // display.printf("====================\nDistance\nNeoPixel: %i\nInfinity Cube: %i\nRoomba: %i\n====================\n", neoSig, infiniSig, roombaSig);
-          // display.display();
-          // String name = scanResults[i].advertisingData().deviceName();
+          display.clearDisplay();
+          display.setCursor(0,0);
+          display.printf("====================\nDistance\nNeoPixel: %i\nInfinity Cube: %i\nRoomba: %i\n====================\n", neoSig, infiniSig, roombaSig);
+          display.display();
+          String name = scanResults[i].advertisingData().deviceName();
           // if (name.length() > 0) {
           //   Log.info("Advertising name: %s", name.c_str());
           // }
         }
       }
       Serial.printf("Scan %i\n%u ms End\n",scanCount, millis()); 
-    }    
-    last = millis();
-    BLE.stopScanning();
-    duckCount = 0;
-    infiniCount = 0;
-    roombaCount = 0;
+    // }    
+    last = millis();    
   }    
 }
 
@@ -173,7 +172,7 @@ void onDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, 
 }
 
 int isRecognized(byte addr1, byte addr0) {
-  Serial.printf("%02X:%02X\n", addr1, addr0);
+  // Serial.printf("%02X:%02X\n", addr1, addr0);
   if ((addr1 == 0xF0) || (addr1 == 0xEF) || (addr1 == 0xC0)) {
     switch (addr0) { //identify if device is recognized and return value correspondent to device
       case 0xA8:        
@@ -195,7 +194,7 @@ int isRecognized(byte addr1, byte addr0) {
   }
 }
 
-int getMedian(int _rssiArray[], int _count) {
+int getClosest(int _rssiArray[], int _count) {
   int medArray[_count];
   for (byte jj = 0; jj < _count; jj++) {
     medArray[jj] = _rssiArray[jj];
