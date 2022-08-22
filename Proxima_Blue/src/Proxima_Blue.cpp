@@ -3,7 +3,7 @@
 /******************************************************/
 
 #include "Particle.h"
-#line 1 "c:/Users/Jason.000/Documents/IoT/Proxima_Blue/Proxima_Blue/src/Proxima_Blue.ino"
+#line 1 "d:/IoT/Proxima_Blue/Proxima_Blue/src/Proxima_Blue.ino"
 /*
  * Project: Proximity_Detection
  * Description: Detect nearby devices to warn machinery operators or automated machines of nearby safety concerns
@@ -18,7 +18,7 @@ void loop();
 void onDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
 int isRecognized(byte addr1, byte addr0);
 int getClosest(int _rssiArray[], int _count);
-#line 10 "c:/Users/Jason.000/Documents/IoT/Proxima_Blue/Proxima_Blue/src/Proxima_Blue.ino"
+#line 10 "d:/IoT/Proxima_Blue/Proxima_Blue/src/Proxima_Blue.ino"
 SYSTEM_THREAD(ENABLED);
 
 SerialLogHandler logHandler;
@@ -38,7 +38,7 @@ const BleUuid txUuid("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
 
 unsigned long lastScan;
 long last = -60000;
-long scanTime = 6000;
+long scanTime = 1000;
 BleAddress peripheralAddr;
 int rssi, i, j, neoSig, infiniSig, roombaSig, scanCount, duckCount, infiniCount, roombaCount;
 int neoDuck[50];
@@ -86,10 +86,10 @@ void setup() {
 
 void loop() {
   if (millis() - last > scanTime) {
-    scanCount = 0;    
+    // scanCount = 0;    
     // for (j = 0; j < 10; j++) {
-      scanCount++;
-      Serial.printf("Scan %i\n%u ms Start\n",scanCount, millis());      
+      // scanCount++;
+      // Serial.printf("Scan %i\n%u ms Start\n",scanCount, millis());      
         //Vector Scan
       // BLE.setScanTimeout(100);
       Vector<BleScanResult> scanResults = BLE.scan();
@@ -97,9 +97,9 @@ void loop() {
         Log.info("%d devices found", scanResults.size());
         for (i = 0; i < scanResults.size(); i++) {
           // For Device OS 2.x and earlier, use scanResults[i].address[0], etc. without the ()
-          // Log.info("MAC: %02X:%02X:%02X:%02X:%02X:%02X | RSSI: %i dBm",
-          //   scanResults[i].address()[5], scanResults[i].address()[4], scanResults[i].address()[3],
-          //   scanResults[i].address()[2], scanResults[i].address()[1], scanResults[i].address()[0], scanResults[i].rssi());
+          Serial.printf("MAC: %02X:%02X:%02X:%02X:%02X:%02X | RSSI: %i dBm",
+            scanResults[i].address()[5], scanResults[i].address()[4], scanResults[i].address()[3],
+            scanResults[i].address()[2], scanResults[i].address()[1], scanResults[i].address()[0], scanResults[i].rssi());
           sprintf((char *)scanMAC,"MAC: %02X:%02X:%02X:%02X:%02X:%02X\nRSSI: %i dBm\n",scanResults[i].address()[5], scanResults[i].address()[4], 
             scanResults[i].address()[3], scanResults[i].address()[2], scanResults[i].address()[1], scanResults[i].address()[0], scanResults[i].rssi());
           int device = isRecognized(scanResults[i].address()[1], scanResults[i].address()[0]);
