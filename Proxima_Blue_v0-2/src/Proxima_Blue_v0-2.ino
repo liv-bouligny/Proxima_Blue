@@ -5,9 +5,14 @@
  * Date: 16 Aug 2022
  */
 
+#include "credentials.h"
 #include "Adafruit_SSD1306.h"
 #include "Particle.h"
+#include "Adafruit_MQTT.h"
+#include "Adafruit_MQTT/Adafruit_MQTT.h" 
+#include "Adafruit_MQTT/Adafruit_MQTT_SPARK.h"
 
+TCPClient TheClient;
 SYSTEM_THREAD(ENABLED);
 
 SerialLogHandler logHandler;
