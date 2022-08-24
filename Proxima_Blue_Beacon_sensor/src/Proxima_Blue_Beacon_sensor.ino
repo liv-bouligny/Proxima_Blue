@@ -5,9 +5,18 @@
  * Date: 19 August 2022
  */
 
+#include "credentials.h"
 #include "Grove_Air_quality_Sensor.h"
 #include "IOTTimer.h"
 #include "DeviceNameHelperRK.h"
+#include "Adafruit_MQTT.h"
+#include "Adafruit_MQTT/Adafruit_MQTT.h" 
+#include "Adafruit_MQTT/Adafruit_MQTT_SPARK.h"
+
+TCPClient TheClient;
+Adafruit_MQTT_SPARK mqtt(&TheClient,AIO_SERVER,AIO_SERVERPORT,AIO_USERNAME,AIO_KEY); 
+Adafruit_MQTT_Publish mqttArtemis = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/artemisaq");
+Adafruit_MQTT_Publish mqttAthena = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/athenaaq");
 
 AirQualitySensor sensor(A0);
 int quality;
@@ -28,9 +37,10 @@ const BleUuid txUuid("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
 
 BleCharacteristic txCharacteristic("tx", BleCharacteristicProperty::NOTIFY, txUuid, serviceUuid);
 BleCharacteristic rxCharacteristic("rx", BleCharacteristicProperty::WRITE_WO_RSP, rxUuid, serviceUuid, onDataReceived, NULL);
+
 BleAdvertisingData data;
 
-SYSTEM_MODE(SEMI_AUTOMATIC); //Using BLE and not Wifi
+// SYSTEM_MODE(SEMI_AUTOMATIC); //Using BLE and not Wifi
 
 void setup() {
   Serial.begin(9600);
@@ -55,11 +65,12 @@ void setup() {
 
     // Used for DeviceNameHelperRK / You must call this from setup!
   DeviceNameHelperEEPROM::instance().setup(EEPROM_OFFSET);
-  Log.info("name=%s", DeviceNameHelperEEPROM::instance().getName());
+  //Log.info("name=%s", DeviceNameHelperEEPROM::instance().getName());  
+  Serial.printf("deviceName = %s\n", DeviceNameHelperEEPROM::instance().getName());
 }
 
 void loop() {  
-
+  MQTT_connect();
   quality = sensor.slope();  
 
   if (millis() - lastCheck > 1000) {
@@ -91,10 +102,16 @@ void loop() {
     lastCheck = millis();
   }
   if (millis() - lastTX > 5000) {
-    sprintf((char *)dataAQ,"%s: %i\n", DeviceNameHelperEEPROM::instance().getName(), sensor.getValue());
+    if (mqtt.Update())  {
+      mqttArtemis.publish(sensor.getValue());
+      // mqttAthena.publish(sensor.getValue());
+  }
+    // sprintf((char *)dataAQ,"%s: %i\n", DeviceNameHelperEEPROM::instance().getName(), sensor.getValue());
     Serial.printf("%s: %i\n", DeviceNameHelperEEPROM::instance().getName(), sensor.getValue());
-    dataAQ[24] = 0x0A;
-    txCharacteristic.setValue(dataAQ, 25);
+    // dataAQ[24] = 0x0A;    
+    // txCharacteristic.setValue(dataAQ, 25);
+    // // athenaTxCharacteristic.setValue(dataAQ, 25);  
+    // // artemisTxCharacteristic.setValue(dataAQ, 25);  
     lastTX = millis();
   }
 }
@@ -109,4 +126,23 @@ void onDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, 
   }
   Serial.printf("\n");
   Serial.printf("Message: %s\n",(char *)data);  
+}
+
+void MQTT_connect() {
+  int8_t ret;
+ 
+  // Stop if already connected.
+  if (mqtt.connected()) {
+    return;
+  }
+ 
+  Serial.print("Connecting to MQTT... ");
+ 
+  while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
+    Serial.printf("%s\n",(char *)mqtt.connectErrorString(ret));
+    Serial.printf("Retrying MQTT connection in 5 seconds..\n");
+    mqtt.disconnect();
+    delay(5000);  // wait 5 seconds
+  }
+  Serial.printf("MQTT Connected!\n");
 }

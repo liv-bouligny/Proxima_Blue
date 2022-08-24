@@ -1,3 +1,8 @@
+/******************************************************/
+//       THIS IS A GENERATED FILE - DO NOT EDIT       //
+/******************************************************/
+
+#line 1 "c:/Users/Jason.000/Documents/IoT/Proxima_Blue/Proxima_Blue_v0-2/src/Proxima_Blue_v0-2.ino"
 /*
  * Project: Proxima Blue
  * Description: Detect nearby devices to warn machinery operators or automated machines of potential human presence
@@ -12,6 +17,10 @@
 #include "Adafruit_MQTT/Adafruit_MQTT.h" 
 #include "Adafruit_MQTT/Adafruit_MQTT_SPARK.h"
 
+void setup();
+void loop();
+int isRecognized(byte addr1, byte addr0);
+#line 15 "c:/Users/Jason.000/Documents/IoT/Proxima_Blue/Proxima_Blue_v0-2/src/Proxima_Blue_v0-2.ino"
 TCPClient TheClient;
 SYSTEM_THREAD(ENABLED);
 
