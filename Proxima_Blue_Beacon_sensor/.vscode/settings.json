@@ -6,6 +6,6 @@
     },
     "particle.targetPlatform": "argon",
     "particle.firmwareVersion": "3.3.0",
-    "particle.targetDevice": "Athena",
+    "particle.targetDevice": "",
     "editor.tabSize": 2
 }

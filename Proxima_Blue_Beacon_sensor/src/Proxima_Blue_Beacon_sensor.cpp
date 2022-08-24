@@ -33,6 +33,8 @@ BleCharacteristic txCharacteristic("tx", BleCharacteristicProperty::NOTIFY, txUu
 BleCharacteristic rxCharacteristic("rx", BleCharacteristicProperty::WRITE_WO_RSP, rxUuid, serviceUuid, onDataReceived, NULL);
 BleAdvertisingData data;
 
+SYSTEM_MODE(SEMI_AUTOMATIC); //Using BLE and not Wifi
+
 void setup() {
   Serial.begin(9600);
 
@@ -45,14 +47,22 @@ void setup() {
   else {
     Serial.printf("Sensor ERROR!\n");
   }
+
+  //Turn on Bluetooth, establish tx and rx characteristics, set Service UUID, and advertise data
+  BLE.on ();
+  BLE.addCharacteristic(txCharacteristic);
+  BLE.addCharacteristic(rxCharacteristic);
+  data.appendServiceUUID(serviceUuid);
+  BLE.advertise(&data);
+  Serial.printf("Argon BLE Address: %s\n", BLE.address().toString().c_str());
+
 }
 
 void loop() {
-  quality = sensor.slope();
-
-  Serial.printf("Sensor value: %i\n", sensor.getValue());
+  quality = sensor.slope();  
 
   if (millis() - lastCheck > 1000) {
+    Serial.printf("Sensor value: %i\n", sensor.getValue());
     if (quality == AirQualitySensor::FORCE_SIGNAL) {
       Serial.printf("High pollution! Force signal active.\n");
       if (millis() - last > 2000) {
@@ -63,20 +73,21 @@ void loop() {
     else if (quality == AirQualitySensor::HIGH_POLLUTION) {
       Serial.printf("High pollution!\n");
       if (millis() - last > 3000) {
-        tone(BUZZPIN, 220, 250);
+        tone(BUZZPIN, 220, 250);        
         last = millis();
       }
     }
     else if (quality == AirQualitySensor::LOW_POLLUTION) {
       Serial.printf("Low pollution!\n");
       if (millis() - last > 5000) {
-        tone(BUZZPIN, 110, 50);
-        last = millis();
+        tone(BUZZPIN, 110, 50);        
       }
+      last = millis();
     }
     else if (quality == AirQualitySensor::FRESH_AIR) {
       Serial.printf("Fresh air.\n");
     }  
+    lastCheck = millis();
   }  
 }
 
