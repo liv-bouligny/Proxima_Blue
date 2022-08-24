@@ -22,6 +22,13 @@ void loop();
 int isRecognized(byte addr1, byte addr0);
 #line 15 "c:/Users/Jason.000/Documents/IoT/Proxima_Blue/Proxima_Blue_v0-2/src/Proxima_Blue_v0-2.ino"
 TCPClient TheClient;
+
+Adafruit_MQTT_SPARK mqtt(&TheClient,AIO_SERVER,AIO_SERVERPORT,AIO_USERNAME,AIO_KEY); 
+Adafruit_MQTT_Subscribe mqttArtemisPull = Adafruit_MQTT_Subscribe(&mqtt,AIO_USERNAME "/feeds/artemisaq");
+Adafruit_MQTT_Subscribe mqttAthenaPull = Adafruit_MQTT_Subscribe(&mqtt,AIO_USERNAME "/feeds/athenaaq");
+Adafruit_MQTT_Publish mqttArtemisPush = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/artemisfrompersephone");
+Adafruit_MQTT_Publish mqttAthenaPush = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/athenafrompersephone");
+
 SYSTEM_THREAD(ENABLED);
 
 SerialLogHandler logHandler;
@@ -59,7 +66,7 @@ unsigned long lastScan, stateTime;
 long last = -60000;
 long scanTime = 1000;
 BleAddress peripheralAddr;
-int rssi, i, j, neoSig, infiniSig, roombaSig, scanCount, duckCount, infiniCount, roombaCount;
+int rssi, i, j, neoSig, artemisSig, athenaSig, scanCount, duckCount, infiniCount, roombaCount;
 int neoDuck[50];
 int infinity[50];
 int roomba[50];
@@ -107,91 +114,89 @@ void setup() {
   display.setTextColor(WHITE);
   display.setCursor(0,0);
   display.display();
+
+  mqtt.subscribe(&mqttArtemisPull);
+  mqtt.subscribe(&mqttAthenaPull);
 }
 
 void loop() {
 
-  switch(state) {
-		case State::SCAN:
-      Serial.printf("scan\n");
-			state = State::WAIT;
-			BLE.scan(scanResultCallback, NULL);
-			break;
+  // switch(state) {
+	// 	case State::SCAN:
+  //     Serial.printf("scan\n");
+	// 		state = State::WAIT;
+	// 		BLE.scan(scanResultCallback, NULL);
+	// 		break;
 			
-		case State::CONNECT:
-      Serial.printf("connect\n");
-			stateConnect();
-			break;
+	// 	case State::CONNECT:
+  //     Serial.printf("connect\n");
+	// 		stateConnect();
+	// 		break;
 
-    case State::RUN:
-      //Serial.printf("run\n");
-			stateRun();
-			break;
+  //   case State::RUN:
+  //     //Serial.printf("run\n");
+	// 		stateRun();
+	// 		break;
 
-    case State::WAIT:
-      Serial.printf("wait\n");
-			if (millis() - stateTime >= 5000) {
-				state = State::SCAN;
-			}
-			break;
-	}
+  //   case State::WAIT:
+  //     Serial.printf("wait\n");
+	// 		if (millis() - stateTime >= 5000) {
+	// 			state = State::SCAN;
+	// 		}
+	// 		break;
+	// }
 
-  // if (millis() - last > scanTime) {
-  //   // scanCount = 0;    
-  //   // for (j = 0; j < 10; j++) {
-  //     // scanCount++;
-  //     // Serial.printf("Scan %i\n%u ms Start\n",scanCount, millis());      
-  //       //Vector Scan
-  //     // BLE.setScanTimeout(100);
-  //     Vector<BleScanResult> scanResults = BLE.scan();
-  //     if (scanResults.size()) {
-  //       Log.info("%d devices found", scanResults.size());
-  //       for (i = 0; i < scanResults.size(); i++) {
-  //         // For Device OS 2.x and earlier, use scanResults[i].address[0], etc. without the ()
-  //         Serial.printf("MAC: %02X:%02X:%02X:%02X:%02X:%02X | RSSI: %i dBm",
-  //           scanResults[i].address()[5], scanResults[i].address()[4], scanResults[i].address()[3],
-  //           scanResults[i].address()[2], scanResults[i].address()[1], scanResults[i].address()[0], scanResults[i].rssi());
-  //         sprintf((char *)scanMAC,"MAC: %02X:%02X:%02X:%02X:%02X:%02X\nRSSI: %i dBm\n",scanResults[i].address()[5], scanResults[i].address()[4], 
-  //           scanResults[i].address()[3], scanResults[i].address()[2], scanResults[i].address()[1], scanResults[i].address()[0], scanResults[i].rssi());
-  //         int device = isRecognized(scanResults[i].address()[1], scanResults[i].address()[0]);
-  //         if (device == 1) {    
-  //           BlePeerDevice peer = BLE.connect(scanResults[i].address());
-  //           if (peer.connected()) {
-  //             peerTxCharacteristic = peer.getCharacteristicByUUID(txUuid);
-  //             peerRxCharacteristic = peer.getCharacteristicByUUID(rxUuid);              
-  //           }
-  //           neoSig = scanResults[i].rssi();
-  //           txCharacteristic.setValue(scanMAC, 50);
-  //           Serial.printf("NeoDuck device 1: %i\n", neoSig);
-  //         }  
-  //         if (device == 2) { 
-  //           infiniSig = scanResults[i].rssi();
-  //           txCharacteristic.setValue(scanMAC, 50);
-  //           Serial.printf("Infinity device 2: %i\n", infiniSig);
-  //         }
-  //         if (device == 3) { 
-  //           roombaSig = scanResults[i].rssi();
-  //           txCharacteristic.setValue(scanMAC, 50);
-  //           Serial.printf("Roomba device 3: %i\n", roombaSig);
-  //         }
-  //         if (scanResults[i].rssi() >= -80) {
-  //           txCharacteristic.setValue(scanMAC, 50);
-  //         }
-  //         // Serial.printf("====================\nDistance\nNeoPixel: %i\nInfinity Cube: %i\nRoomba: %i\n====================\n", neoSig, infiniSig, roombaSig);
-  //         display.clearDisplay();
-  //         display.setCursor(0,0);
-  //         display.printf("====================\nDistance\nNeoPixel: %i\nInfinity Cube: %i\nRoomba: %i\n====================\n", neoSig, infiniSig, roombaSig);
-  //         display.display();
-  //         String name = scanResults[i].advertisingData().deviceName();
-  //         // if (name.length() > 0) {
-  //         //   Log.info("Advertising name: %s", name.c_str());
-  //         // }
-  //       }
-  //     }
-  //     Serial.printf("Scan %i\n%u ms End\n",scanCount, millis()); 
-  //   // }    
-  //   last = millis();    
-  // }    
+  if (millis() - last > scanTime) {
+    // scanCount = 0;    
+    // for (j = 0; j < 10; j++) {
+      // scanCount++;
+      // Serial.printf("Scan %i\n%u ms Start\n",scanCount, millis());      
+        //Vector Scan
+      // BLE.setScanTimeout(100);
+      Vector<BleScanResult> scanResults = BLE.scan();
+      if (scanResults.size()) {
+        Log.info("%d devices found", scanResults.size());
+        for (i = 0; i < scanResults.size(); i++) {
+          // For Device OS 2.x and earlier, use scanResults[i].address[0], etc. without the ()
+          // Serial.printf("MAC: %02X:%02X:%02X:%02X:%02X:%02X | RSSI: %i dBm\n",
+          //   scanResults[i].address()[5], scanResults[i].address()[4], scanResults[i].address()[3],
+          //   scanResults[i].address()[2], scanResults[i].address()[1], scanResults[i].address()[0], scanResults[i].rssi());
+          sprintf((char *)scanMAC,"MAC: %02X:%02X:%02X:%02X:%02X:%02X\nRSSI: %i dBm\n",scanResults[i].address()[5], scanResults[i].address()[4], 
+            scanResults[i].address()[3], scanResults[i].address()[2], scanResults[i].address()[1], scanResults[i].address()[0], scanResults[i].rssi());
+          int device = isRecognized(scanResults[i].address()[1], scanResults[i].address()[0]);
+          if (device == 1) {
+            artemisSig = scanResults[i].rssi();
+            txCharacteristic.setValue(scanMAC, 50);
+            Serial.printf("Artemis, device 1: %i\n", artemisSig);
+          }  
+          if (device == 2) { 
+            athenaSig = scanResults[i].rssi();
+            txCharacteristic.setValue(scanMAC, 50);
+            Serial.printf("Athena, device 2: %i\n", athenaSig);
+          }
+          if (device == 3) { 
+            neoSig = scanResults[i].rssi();
+            txCharacteristic.setValue(scanMAC, 50);
+            Serial.printf("Neo Pixel, device 3: %i\n", neoSig);
+          }
+          if (scanResults[i].rssi() >= -70) {
+            txCharacteristic.setValue(scanMAC, 50);
+          }
+          // Serial.printf("====================\nDistance\nNeoPixel: %i\nInfinity Cube: %i\nRoomba: %i\n====================\n", neoSig, infiniSig, roombaSig);
+          display.clearDisplay();
+          display.setCursor(0,0);
+          display.printf("=====================\nBle Signal Strength\nNeoPixel: %i\nArtemis: %i\nAthena: %i\n=====================\n", neoSig, artemisSig, athenaSig);
+          display.display();
+          String name = scanResults[i].advertisingData().deviceName();
+          if (name.length() > 0) {
+            Log.info("Advertising name: %s", name.c_str());
+          }
+        }
+      }
+      Serial.printf("Scan %i\n%u ms End\n",scanCount, millis()); 
+    // }
+    last = millis();    
+  }    
 }
 
 void scanResultCallback(const BleScanResult *scanResult, void *context) {
