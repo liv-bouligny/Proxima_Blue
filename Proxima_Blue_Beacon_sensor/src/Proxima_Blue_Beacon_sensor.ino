@@ -7,12 +7,18 @@
 
 #include "Grove_Air_quality_Sensor.h"
 #include "IOTTimer.h"
+#include "DeviceNameHelperRK.h"
 
 AirQualitySensor sensor(A0);
 int quality;
 unsigned long last, lastCheck, lastTX;
 const int BUZZPIN = D3;
 byte dataAQ[25];
+
+//Used for DeviceNameHelperRK
+SerialLogHandler logHandler;
+SYSTEM_THREAD(ENABLED);
+int EEPROM_OFFSET = 1;
 
 // These UUIDs were defined by Nordic Semiconductor and are now the defacto standard for
 // UART-like services over BLE. Many apps support the UUIDs now, like the Adafruit Bluefruit app.
@@ -39,7 +45,7 @@ void setup() {
     Serial.printf("Sensor ERROR!\n");
   }
 
-  //Turn on Bluetooth, establish tx and rx characteristics, set Service UUID, and advertise data
+    //Turn on Bluetooth, establish tx and rx characteristics, set Service UUID, and advertise data
   BLE.on ();
   BLE.addCharacteristic(txCharacteristic);
   BLE.addCharacteristic(rxCharacteristic);
@@ -47,9 +53,13 @@ void setup() {
   BLE.advertise(&data);
   Serial.printf("Argon BLE Address: %s\n", BLE.address().toString().c_str());
 
+    // Used for DeviceNameHelperRK / You must call this from setup!
+  DeviceNameHelperEEPROM::instance().setup(EEPROM_OFFSET);
+  Log.info("name=%s", DeviceNameHelperEEPROM::instance().getName());
 }
 
-void loop() {
+void loop() {  
+
   quality = sensor.slope();  
 
   if (millis() - lastCheck > 1000) {
@@ -81,7 +91,11 @@ void loop() {
     lastCheck = millis();
   }
   if (millis() - lastTX > 5000) {
+    sprintf((char *)dataAQ,"%s: %i\n", DeviceNameHelperEEPROM::instance().getName(), sensor.getValue());
+    Serial.printf("%s: %i\n", DeviceNameHelperEEPROM::instance().getName(), sensor.getValue());
+    dataAQ[24] = 0x0A;
     txCharacteristic.setValue(dataAQ, 25);
+    lastTX = millis();
   }
 }
 
