@@ -55,7 +55,7 @@ BleAddress serverAddr;
 int counter = 0;
 unsigned long lastScan, stateTime;
 long last = -60000;
-long scanTime = 1000;
+long scanTime = 5000;
 BleAddress peripheralAddr;
 int rssi, i, j, neoSig, artemisSig, athenaSig, scanCount, duckCount, infiniCount, roombaCount;
 int neoDuck[50];
@@ -138,6 +138,7 @@ void loop() {
 	// }
 
   if (millis() - last > scanTime) {
+    display.clearDisplay();
     // scanCount = 0;    
     // for (j = 0; j < 10; j++) {
       // scanCount++;
@@ -158,7 +159,7 @@ void loop() {
           if (device == 1) {
             artemisSig = scanResults[i].rssi();
             txCharacteristic.setValue(scanMAC, 50);
-            Serial.printf("Artemis, device 1: %i\n", artemisSig);
+            Serial.printf("Known device, Artemis: %i\n", artemisSig);
           }  
           if (device == 2) { 
             athenaSig = scanResults[i].rssi();
@@ -176,7 +177,7 @@ void loop() {
           // Serial.printf("====================\nDistance\nNeoPixel: %i\nInfinity Cube: %i\nRoomba: %i\n====================\n", neoSig, infiniSig, roombaSig);
           display.clearDisplay();
           display.setCursor(0,0);
-          display.printf("=====================\nBle Signal Strength\nNeoPixel: %i\nArtemis: %i\nAthena: %i\n=====================\n", neoSig, artemisSig, athenaSig);
+          display.printf("=====================\nNeoPixel: %i\nArtemis: %i\nAthena: %i\n=====================\n", neoSig, artemisSig, athenaSig);
           display.display();
           String name = scanResults[i].advertisingData().deviceName();
           if (name.length() > 0) {

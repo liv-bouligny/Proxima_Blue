@@ -3,7 +3,7 @@
 /******************************************************/
 
 #include "Particle.h"
-#line 1 "c:/Users/Jason.000/Documents/IoT/Proxima_Blue/Proxima_Blue_Beacon_sensor/src/Proxima_Blue_Beacon_sensor.ino"
+#line 1 "d:/IoT/Proxima_Blue/Proxima_Blue_Beacon_sensor/src/Proxima_Blue_Beacon_sensor.ino"
 /*
  * Project Proxima_Blue_Beacon_sensor
  * Description: Beacon device intended to broadcast BLE to communicate Air Quality data with Central devices0
@@ -23,7 +23,7 @@ void setup();
 void loop();
 void onDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
 void MQTT_connect();
-#line 16 "c:/Users/Jason.000/Documents/IoT/Proxima_Blue/Proxima_Blue_Beacon_sensor/src/Proxima_Blue_Beacon_sensor.ino"
+#line 16 "d:/IoT/Proxima_Blue/Proxima_Blue_Beacon_sensor/src/Proxima_Blue_Beacon_sensor.ino"
 TCPClient TheClient;
 Adafruit_MQTT_SPARK mqtt(&TheClient,AIO_SERVER,AIO_SERVERPORT,AIO_USERNAME,AIO_KEY); 
 Adafruit_MQTT_Publish mqttArtemis = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/artemisaq");
