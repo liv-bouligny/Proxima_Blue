@@ -51,7 +51,7 @@ const BleUuid txUuid("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
 int counter = 0;
 unsigned long lastPub;
 long last = -60000;
-long scanTime = 5000;
+long scanTime = 10000;
 int rssi, i, j, neoSig, artemisSig, athenaSig, artemisAQ, athenaAQ;
 bool checked = false;
 byte scanMAC[50];
@@ -88,6 +88,7 @@ void setup() {
   delay(2000);
   display.clearDisplay();
   display.setTextSize(1);
+  display.setTextWrap(false);
   display.setTextColor(WHITE);  
   display.setCursor(0,0);
   display.display();
@@ -100,15 +101,25 @@ void loop() {
   MQTT_connect();
 
   if (millis() - last > scanTime) {
+    j=0;
     display.clearDisplay();
     display.setCursor(0,0);
-    display.setTextSize(1);
-    display.printf("====Known Devices====\n");
-    display.display();    
+    display.setTextSize(2);
+    display.printf("Scanning!");
+    display.display();
+    display.startscrollleft(0x00,0x03);
     Vector<BleScanResult> scanResults = BLE.scan();
     // For Device OS 2.x and earlier, use scanResults[i].address[0], etc. without the ()
     if (scanResults.size()) {
+      display.stopscroll();
+      display.clearDisplay();
       Log.info("%d devices found", scanResults.size());
+      display.setCursor(0,0);
+      display.setTextSize(1);
+      display.printf("====Known Devices====\n");
+      display.setCursor(0,32);
+      display.printf("===Unknown Devices===\n");
+      display.display();
       for (i = 0; i < scanResults.size(); i++) {          
         sprintf((char *)scanMAC,"MAC: %02X:%02X:%02X:%02X:%02X:%02X\nRSSI: %i dBm\n",scanResults[i].address()[5], scanResults[i].address()[4], 
           scanResults[i].address()[3], scanResults[i].address()[2], scanResults[i].address()[1], scanResults[i].address()[0], scanResults[i].rssi());
@@ -140,25 +151,23 @@ void loop() {
           display.printf("Neo nearby!\n");
           display.display();
         }
-        else {            
-          if (scanResults[i].rssi() >= -70) {
-            txCharacteristic.setValue(scanMAC, 50);
-            if (!checked) {                
-              display.setTextSize(1);
-              display.setCursor(0,32);
-              display.printf("===Unknown Devices===\n");
-              display.setTextSize(2);
-              display.printf("%i Devices\n", scanResults.size());
-              display.display();
-              display.startscrollleft(0x0E, 0x0F);
-              checked = true;
-            }
+        if (scanResults[i].rssi() >= -70) {        
+          txCharacteristic.setValue(scanMAC, 50);
+          if (device == 0) {            
+            j++;
           }
         }        
         String name = scanResults[i].advertisingData().deviceName();
         if (name.length() > 0) {
           Log.info("Advertising name: %s", name.c_str());
         }
+      }
+      if (j > 0) {            
+        display.setTextSize(2);
+        display.setCursor(0,48);
+        display.printf("%i Devices\n", j);
+        display.startscrollleft(0x0E, 0x0F);
+        display.display();        
       }
     } 
     last = millis();  
