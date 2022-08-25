@@ -101,17 +101,15 @@ void loop() {
     }  
     lastCheck = millis();
   }
-  if (millis() - lastTX > 5000) {
+  if (millis() - lastTX > 10000) {
     if (mqtt.Update())  {
-      mqttArtemis.publish(sensor.getValue());
-      // mqttAthena.publish(sensor.getValue());
-  }
-    // sprintf((char *)dataAQ,"%s: %i\n", DeviceNameHelperEEPROM::instance().getName(), sensor.getValue());
+      // mqttArtemis.publish(sensor.getValue());
+      mqttAthena.publish(sensor.getValue());
+    }
+    sprintf((char *)dataAQ,"%s: %i\n", DeviceNameHelperEEPROM::instance().getName(), sensor.getValue());
     Serial.printf("%s: %i\n", DeviceNameHelperEEPROM::instance().getName(), sensor.getValue());
-    // dataAQ[24] = 0x0A;    
-    // txCharacteristic.setValue(dataAQ, 25);
-    // // athenaTxCharacteristic.setValue(dataAQ, 25);  
-    // // artemisTxCharacteristic.setValue(dataAQ, 25);  
+    dataAQ[24] = 0x0A;    
+    txCharacteristic.setValue(dataAQ, 25);
     lastTX = millis();
   }
 }

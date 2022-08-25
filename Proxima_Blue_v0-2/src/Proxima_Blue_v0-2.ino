@@ -36,48 +36,20 @@ Adafruit_SSD1306 display(OLED_RESET);
 const BleUuid serviceUuid("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
 const BleUuid rxUuid("6E400002-B5A3-F393-E0A9-E50E24DCCA9E");
 const BleUuid txUuid("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
-BleUuid counterCharacteristicUuid("520be804-2cc6-455e-b449-558a4555687e");
 
-BlePeerDevice peer;
-BleCharacteristic counterCharacteristic;
-BleCharacteristic athenaCharacteristic;
-BleCharacteristic artemisCharacteristic;
-
-enum class State {
-	SCAN,
-	CONNECT,
-	RUN,
-	WAIT
-};
-
-State state = State::SCAN;
-BleAddress serverAddr;
 int counter = 0;
-unsigned long lastScan, stateTime;
+unsigned long lastPub;
 long last = -60000;
 long scanTime = 5000;
-BleAddress peripheralAddr;
-int rssi, i, j, neoSig, artemisSig, athenaSig, scanCount, duckCount, infiniCount, roombaCount;
-int neoDuck[50];
-int infinity[50];
-int roomba[50];
+int rssi, i, j, neoSig, artemisSig, athenaSig, artemisAQ, athenaAQ;
+bool checked = false;
 byte scanMAC[50];
-
-void onPairingEvent(const BlePairingEvent& event, void* context);
-void onDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
-void scanResultCallback(const BleScanResult *scanResult, void *context);
-void stateConnect();
-void stateRun();
-
 
 BleCharacteristic txCharacteristic("tx", BleCharacteristicProperty::NOTIFY, txUuid, serviceUuid);
 BleCharacteristic rxCharacteristic("rx", BleCharacteristicProperty::WRITE_WO_RSP, rxUuid, serviceUuid, onDataReceived, NULL);
 BleAdvertisingData data;
 
 BleScanResult scanResults[SCAN_RESULT_MAX];
-LEDStatus ledOverride(RGB_COLOR_WHITE, LED_PATTERN_SOLID, LED_SPEED_NORMAL, LED_PRIORITY_IMPORTANT);
-
-void scanResultCallback(const BleScanResult *scanResult, void *context);
 
 // SYSTEM_MODE(SEMI_AUTOMATIC);
 
@@ -92,17 +64,20 @@ void setup() {
   BLE.addCharacteristic(rxCharacteristic);
   data.appendServiceUUID(serviceUuid);
   BLE.advertise(&data);
+    // Set Tx power (-20, -16, -12, -8, -4, 0, 4, 8) & Select the external BLE antenna
   BLE.setTxPower(8);
-  // Select the external antenna
   BLE.selectAntenna(BleAntennaType::EXTERNAL);
-  Serial.printf("Argon BLE Address: %s\n", BLE.address().toString().c_str());
+
+  // Uncomment below to print device BLE Address
+  // Serial.printf("Argon BLE Address: %s\n", BLE.address().toString().c_str());
 
   display.begin(SSD1306_SWITCHCAPVCC, OLEDADD);
+  display.stopscroll();
   display.display(); // show splashscreen
   delay(2000);
   display.clearDisplay();
   display.setTextSize(1);
-  display.setTextColor(WHITE);
+  display.setTextColor(WHITE);  
   display.setCursor(0,0);
   display.display();
 
@@ -110,187 +85,94 @@ void setup() {
   mqtt.subscribe(&mqttAthenaPull);
 }
 
-void loop() {
-
-  // switch(state) {
-	// 	case State::SCAN:
-  //     Serial.printf("scan\n");
-	// 		state = State::WAIT;
-	// 		BLE.scan(scanResultCallback, NULL);
-	// 		break;
-			
-	// 	case State::CONNECT:
-  //     Serial.printf("connect\n");
-	// 		stateConnect();
-	// 		break;
-
-  //   case State::RUN:
-  //     //Serial.printf("run\n");
-	// 		stateRun();
-	// 		break;
-
-  //   case State::WAIT:
-  //     Serial.printf("wait\n");
-	// 		if (millis() - stateTime >= 5000) {
-	// 			state = State::SCAN;
-	// 		}
-	// 		break;
-	// }
+void loop() {  
+  MQTT_connect();
 
   if (millis() - last > scanTime) {
     display.clearDisplay();
-    // scanCount = 0;    
-    // for (j = 0; j < 10; j++) {
-      // scanCount++;
-      // Serial.printf("Scan %i\n%u ms Start\n",scanCount, millis());      
-        //Vector Scan
-      // BLE.setScanTimeout(100);
-      Vector<BleScanResult> scanResults = BLE.scan();
-      if (scanResults.size()) {
-        Log.info("%d devices found", scanResults.size());
-        for (i = 0; i < scanResults.size(); i++) {
-          // For Device OS 2.x and earlier, use scanResults[i].address[0], etc. without the ()
-          // Serial.printf("MAC: %02X:%02X:%02X:%02X:%02X:%02X | RSSI: %i dBm\n",
-          //   scanResults[i].address()[5], scanResults[i].address()[4], scanResults[i].address()[3],
-          //   scanResults[i].address()[2], scanResults[i].address()[1], scanResults[i].address()[0], scanResults[i].rssi());
-          sprintf((char *)scanMAC,"MAC: %02X:%02X:%02X:%02X:%02X:%02X\nRSSI: %i dBm\n",scanResults[i].address()[5], scanResults[i].address()[4], 
-            scanResults[i].address()[3], scanResults[i].address()[2], scanResults[i].address()[1], scanResults[i].address()[0], scanResults[i].rssi());
-          int device = isRecognized(scanResults[i].address()[1], scanResults[i].address()[0]);
-          if (device == 1) {
-            artemisSig = scanResults[i].rssi();
-            txCharacteristic.setValue(scanMAC, 50);
-            Serial.printf("Known device, Artemis: %i\n", artemisSig);
-          }  
-          if (device == 2) { 
-            athenaSig = scanResults[i].rssi();
-            txCharacteristic.setValue(scanMAC, 50);
-            Serial.printf("Athena, device 2: %i\n", athenaSig);
-          }
-          if (device == 3) { 
-            neoSig = scanResults[i].rssi();
-            txCharacteristic.setValue(scanMAC, 50);
-            Serial.printf("Neo Pixel, device 3: %i\n", neoSig);
-          }
+    display.setCursor(0,0);
+    display.setTextSize(1);
+    display.printf("====Known Devices====\n");
+    display.display();    
+    Vector<BleScanResult> scanResults = BLE.scan();
+    // For Device OS 2.x and earlier, use scanResults[i].address[0], etc. without the ()
+    if (scanResults.size()) {
+      Log.info("%d devices found", scanResults.size());
+      for (i = 0; i < scanResults.size(); i++) {          
+        sprintf((char *)scanMAC,"MAC: %02X:%02X:%02X:%02X:%02X:%02X\nRSSI: %i dBm\n",scanResults[i].address()[5], scanResults[i].address()[4], 
+          scanResults[i].address()[3], scanResults[i].address()[2], scanResults[i].address()[1], scanResults[i].address()[0], scanResults[i].rssi());
+        int device = isRecognized(scanResults[i].address()[1], scanResults[i].address()[0]);
+        if (device == 1) {
+          artemisSig = scanResults[i].rssi();
+          txCharacteristic.setValue(scanMAC, 50);
+          Serial.printf("Artemis, device 1: %i\n", artemisSig);
+          display.setTextSize(1);
+          display.setCursor(0,8);
+          display.printf("Artemis nearby!\n");
+          display.display();
+        }  
+        if (device == 2) { 
+          athenaSig = scanResults[i].rssi();
+          txCharacteristic.setValue(scanMAC, 50);
+          Serial.printf("Athena, device 2: %i\n", athenaSig);
+          display.setTextSize(1);
+          display.setCursor(0,16);
+          display.printf("Athena nearby!\n");
+          display.display();
+        }
+        if (device == 3) { 
+          neoSig = scanResults[i].rssi();
+          txCharacteristic.setValue(scanMAC, 50);
+          Serial.printf("Neo Pixel, device 3: %i\n", neoSig);
+          display.setTextSize(1);
+          display.setCursor(0,24);
+          display.printf("Neo nearby!\n");
+          display.display();
+        }
+        else {            
           if (scanResults[i].rssi() >= -70) {
             txCharacteristic.setValue(scanMAC, 50);
+            if (!checked) {                
+              display.setTextSize(1);
+              display.setCursor(0,32);
+              display.printf("===Unknown Devices===\n");
+              display.setTextSize(2);
+              display.printf("%i Devices\n", scanResults.size());
+              display.display();
+              display.startscrollleft(0x0E, 0x0F);
+              checked = true;
+            }
           }
-          // Serial.printf("====================\nDistance\nNeoPixel: %i\nInfinity Cube: %i\nRoomba: %i\n====================\n", neoSig, infiniSig, roombaSig);
-          display.clearDisplay();
-          display.setCursor(0,0);
-          display.printf("=====================\nNeoPixel: %i\nArtemis: %i\nAthena: %i\n=====================\n", neoSig, artemisSig, athenaSig);
-          display.display();
-          String name = scanResults[i].advertisingData().deviceName();
-          if (name.length() > 0) {
-            Log.info("Advertising name: %s", name.c_str());
-          }
+        }        
+        String name = scanResults[i].advertisingData().deviceName();
+        if (name.length() > 0) {
+          Log.info("Advertising name: %s", name.c_str());
         }
       }
-      Serial.printf("Scan %i\n%u ms End\n",scanCount, millis()); 
-    // }
-    last = millis();    
+    } 
+    last = millis();  
+    checked = false;  
   }    
-}
 
-void scanResultCallback(const BleScanResult *scanResult, void *context) {
-  BleUuid foundServiceUuid;
-	size_t svcCount = scanResult->advertisingData().serviceUUID(&foundServiceUuid, 1);
-	if (svcCount == 0 || !(foundServiceUuid == serviceUuid)) {
-		//Log.info("ignoring %02X:%02X:%02X:%02X:%02X:%02X, not our service",
-		//		scanResult->address()[0], scanResult->address()[1], scanResult->address()[2],
-		//		scanResult->address()[3], scanResult->address()[4], scanResult->address()[5]);
-		return;
-	}
-  Log.info("found server %02X:%02X:%02X:%02X:%02X:%02X",
-    scanResult->address()[0], scanResult->address()[1], scanResult->address()[2],
-    scanResult->address()[3], scanResult->address()[4], scanResult->address()[5]);
-    serverAddr = scanResult->address();
-	state = State::CONNECT;
-  
-  	// We always stop scanning after the first lock device is found
-	BLE.stopScanning();
-}
-
-void onPairingEvent(const BlePairingEvent& event, void* context) {
-	if (event.type == BlePairingEventType::REQUEST_RECEIVED) {
-		Log.info("onPairingEvent REQUEST_RECEIVED");
-	}
-	else
-	if (event.type == BlePairingEventType::PASSKEY_DISPLAY) {
-		char passKeyStr[BLE_PAIRING_PASSKEY_LEN + 1];
-		memcpy(passKeyStr, event.payload.passkey, BLE_PAIRING_PASSKEY_LEN);
-		passKeyStr[BLE_PAIRING_PASSKEY_LEN] = 0;
-    Log.info("onPairingEvent PASSKEY_DISPLAY %s", passKeyStr);
-	}
-	else
-	if (event.type == BlePairingEventType::STATUS_UPDATED) {
-		Log.info("onPairingEvent STATUS_UPDATED status=%d lesc=%d bonded=%d", 
-			event.payload.status.status,
-			(int)event.payload.status.lesc,
-			(int)event.payload.status.bonded);
-	}
-	else
-	if (event.type == BlePairingEventType::NUMERIC_COMPARISON) {
-		Log.info("onPairingEvent NUMERIC_COMPARISON");
-	}
-}
-
-void onDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context) {
-  size_t i;
-  display.setCursor(0,0);
-  display.printf("Received data from: %02X:%02X:%02X:%02X:%02X:%02X \n", peer.address()[0], peer.address()[1],peer.address()[2], peer.address()[3], peer.address()[4], peer.address()[5]);
-  display.display();
-  Serial.printf("Received data from: %02X:%02X:%02X:%02X:%02X:%02X \n", peer.address()[0], peer.address()[1],peer.address()[2], peer.address()[3], peer.address()[4], peer.address()[5]);
-  for (i = 0; i < len; i++) {
-      Serial.printf("%c",data[i]);
-      display.printf("%c",data[i]);
-      display.display();
+  Adafruit_MQTT_Subscribe *subscription;
+  while ((subscription = mqtt.readSubscription(100))) {
+    if (subscription == &mqttArtemisPull) {
+      artemisAQ = atoi((char *)mqttArtemisPull.lastread);
+    }
+    if (subscription == &mqttAthenaPull) {
+      athenaAQ = atoi((char *)mqttAthenaPull.lastread);
+    }
   }
-  Serial.printf("\n");
-  display.printf("\n");
-  display.display();
-}
 
-void stateConnect() {
-	Log.info("about to connect");
-  
-  peer = BLE.connect(serverAddr);
-	if (!peer.connected()) {
-		Log.info("failed to connect, retrying");
-		state = State::WAIT;
-		stateTime = millis();
-		return;
-	}
-	Log.info("Connected, starting pairing...");
-  
-  peer.getCharacteristicByUUID(counterCharacteristic, counterCharacteristicUuid);
-	
-	BLE.startPairing(peer);
-
-  state = State::RUN;
-	stateTime = millis();
-}
-
-void stateRun() {
-	int counter2;
-  counter2 = random(0x30,0x3A);
-  if (!peer.connected()) {
-		// Server disconnected
-		state = State::WAIT;
-		stateTime = millis();
-		return;
-	}
-	if (BLE.isPairing(peer)) {
-		// Still in process of doing LESC secure pairing
-		return;
-	}
-	if (millis() - stateTime < 2000) {
-		return;
-	}
-	stateTime = millis();
-  
-  counterCharacteristic.setValue((const uint8_t *)&counter2, sizeof(counter2));
-	Log.info("sent counter=0x%02X", counter2);
-	counter++;
+  if (millis() - lastPub > 10000) {
+    if (mqtt.Update()) {
+      mqttArtemisPush.publish(artemisAQ);
+      Serial.printf("ArtemisAQ: %i\n", artemisAQ);
+      mqttAthenaPush.publish(athenaAQ);
+      Serial.printf("AthenaAQ: %i\n", athenaAQ);
+    }
+    lastPub = millis();
+  }
 }
 
 int isRecognized(byte addr1, byte addr0) {
@@ -316,26 +198,33 @@ int isRecognized(byte addr1, byte addr0) {
   }
 }
 
-// int getClosest(int _rssiArray[], int _count) {
-//   int medArray[_count];
-//   for (byte jj = 0; jj < _count; jj++) {
-//     medArray[jj] = _rssiArray[jj];
-//   }
-//   int ii, jj, temp;
-//   for (jj = 0; jj < _count - 1; jj++) {
-//     for (ii = 0; ii < _count - jj - 1; ii++) {
-//       if (medArray[ii] > medArray[ii+1]) {      
-//         temp = medArray[ii];
-//         medArray[ii] = medArray[ii+1];
-//         medArray[ii+1] = temp;
-//       }
-//     }
-//   }  
-//   if ((_count & 1) > 0) {
-//     temp = medArray[(_count - 1) / 2];
-//   }
-//   else {
-//     temp = (medArray[_count / 2] + medArray[(_count / 2)-1]) / 2;
-//   }
-//   return temp;
-// }
+void MQTT_connect() {
+  int8_t ret;
+ 
+  // Stop if already connected.
+  if (mqtt.connected()) {
+    return;
+  }
+ 
+  Serial.print("Connecting to MQTT... ");
+ 
+  while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
+    Serial.printf("%s\n",(char *)mqtt.connectErrorString(ret));
+    Serial.printf("Retrying MQTT connection in 5 seconds..\n");
+    mqtt.disconnect();
+    delay(5000);  // wait 5 seconds
+  }
+  Serial.printf("MQTT Connected!\n");
+}
+
+void onDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context) {
+  uint8_t i;
+  
+  Serial.printf("Received data from:%02X:%02X:%02X:%02X:%02X:%02X\n",peer.address()[0], peer.address()[1], peer.address()[2], peer.address()[3], peer.address()[4], peer.address()[5]);
+  Serial.printf("Bytes: ");
+  for (i = 0;i < len; i++) {
+    Serial.printf("%02X ",data[i]);
+  }
+  Serial.printf("\n");
+  Serial.printf("Message: %s\n",(char *)data);  
+}
